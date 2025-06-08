@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell, LineChart, Line
@@ -14,10 +14,22 @@ const { Option } = Select;
 const COLORS = ['#1890ff', '#52c41a', '#faad14', '#eb2f96', '#722ed1'];
 const API = import.meta.env.VITE_API_URL;
 
+interface Item {
+  _id: string;
+  name: string;
+  price: number;
+  category: string;
+  purchased: boolean;
+}
+
+interface CategoryTotals {
+  [category: string]: number;
+}
+
 const App = () => {
-  const [items, setItems] = useState([]);
-  const [form, setForm] = useState({ name: '', price: '', category: '', purchased: false });
-  const [editingItemId, setEditingItemId] = useState(null);
+  const [items, setItems] = useState<Item[]>([]);
+  const [form, setForm] = useState<Omit<Item, '_id'>>({ name: '', price: 0, category: '', purchased: false });
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const screens = useBreakpoint();
 
   useEffect(() => {
@@ -29,7 +41,7 @@ const App = () => {
     setItems(res.data);
   };
 
-  const handleChange = (field, value) => {
+  const handleChange = (field: keyof typeof form, value: string | number | boolean) => {
     setForm({ ...form, [field]: value });
   };
 
@@ -41,27 +53,29 @@ const App = () => {
         await axios.post(`${API}/items`, form);
       }
       fetchItems();
-      setForm({ name: '', price: '', category: '', purchased: false });
+      setForm({ name: '', price: 0, category: '', purchased: false });
       setEditingItemId(null);
     }
   };
 
-  const deleteItem = async (id) => {
+  const deleteItem = async (id: string) => {
     await axios.delete(`${API}/items/${id}`);
     fetchItems();
   };
 
-  const editItem = (item) => {
-    setForm(item);
+  const editItem = (item: Item) => {
+    // Remove _id from form state to match Omit<Item, '_id'>
+    const { _id, ...rest } = item;
+    setForm(rest);
     setEditingItemId(item._id);
   };
 
-  const toggleStatus = async (item) => {
+  const toggleStatus = async (item: Item) => {
     await axios.put(`${API}/items/${item._id}`, { ...item, purchased: !item.purchased });
     fetchItems();
   };
 
-  const categoryTotals = items.reduce((acc, item) => {
+  const categoryTotals = items.reduce<CategoryTotals>((acc, item) => {
     acc[item.category] = (acc[item.category] || 0) + item.price;
     return acc;
   }, {});
@@ -71,7 +85,7 @@ const App = () => {
   const totalPrice = items.reduce((sum, item) => sum + item.price, 0);
   const totalSpent = items.filter(item => item.purchased).reduce((sum, item) => sum + item.price, 0);
   const totalRemaining = totalPrice - totalSpent;
-  const formatPrice = (price) => price.toLocaleString('en-IN');
+  const formatPrice = (price: number) => price.toLocaleString('en-IN');
 
   return (
     <Layout style={{ minHeight: '100vh', padding: '2rem', background: '#f0f2f5' }}>
@@ -80,7 +94,7 @@ const App = () => {
         <Card style={{ marginBottom: '2rem', width: '100%' }}>
           <Row gutter={[16, 16]} justify="center">
             <Col xs={24} sm={12} md={6}><Input placeholder="Item Name" value={form.name} onChange={(e) => handleChange('name', e.target.value)} /></Col>
-            <Col xs={24} sm={12} md={6}><InputNumber placeholder="Price (₹)" style={{ width: '100%' }} value={form.price} onChange={(value) => handleChange('price', value)} /></Col>
+            <Col xs={24} sm={12} md={6}><InputNumber placeholder="Price (₹)" style={{ width: '100%' }} value={form.price} onChange={(value) => handleChange('price', value ?? 0)} /></Col>
             <Col xs={24} sm={12} md={6}>
               <Select placeholder="Select Category" value={form.category} onChange={(value) => handleChange('category', value)} style={{ width: '100%' }}>
                 <Option value="Furniture">Furniture</Option>
@@ -137,7 +151,7 @@ const App = () => {
           <Col span={24}>
             <Card><Title level={4}>🟠 Category Distribution Pie</Title>
               <ResponsiveContainer width="100%" height={300}>
-                <PieChart><Pie data={chartData} dataKey="total" nameKey="category" cx="50%" cy="50%" outerRadius={100} label>{chartData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}</Pie><Tooltip /><Legend /></PieChart>
+                <PieChart><Pie data={chartData} dataKey="total" nameKey="category" cx="50%" cy="50%" outerRadius={100} label>{chartData.map((_, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}</Pie><Tooltip /><Legend /></PieChart>
               </ResponsiveContainer>
             </Card>
           </Col>
